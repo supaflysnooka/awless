@@ -13,6 +13,7 @@ type Env struct {
 	externalParams map[string]interface{}
 
 	Resolved         map[string]interface{}
+	DefLookupFunc    LookupTemplateDefFunc
 	AliasFunc        func(key, alias string) string
 	MissingHolesFunc func(string) interface{}
 
@@ -53,10 +54,12 @@ func (e *Env) AddExternalParams(exts ...map[string]interface{}) {
 }
 func Compile(tpl *Template, env *Env) (*Template, *Env, error) {
 	pass := newMultiPass(
+		resolveAgainstDefinitions,
 		mergeExternalParamsPass,
 		resolveHolesPass,
 		resolveAliasPass,
 		resolveMissingHolesPass,
+		resolveAliasPass,
 	)
 
 	return pass.compile(tpl, env)
@@ -84,24 +87,107 @@ func (p *multiPass) compile(tpl *Template, env *Env) (newTpl *Template, newEnv *
 	return
 }
 
+func resolveAgainstDefinitions(tpl *Template, env *Env) (*Template, *Env, error) {
+	env.Log.ExtraVerbosef("resolve against definitions pass")
+
+	each := func(cmd *ast.CommandNode) error {
+		key := fmt.Sprintf("%s%s", cmd.Action, cmd.Entity)
+		def, ok := env.DefLookupFunc(key)
+		if !ok {
+			return fmt.Errorf("cannot find template definition for '%s'", key)
+		}
+
+		for p, _ := range cmd.Params {
+			var found bool
+
+			for _, k := range def.Required() {
+				if k == p {
+					found = true
+					break
+				}
+			}
+
+			for _, k := range def.Extra() {
+				if k == p {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("%s %s: unexpected param '%s'", cmd.Action, cmd.Entity, p)
+			}
+		}
+
+		return nil
+	}
+
+	if err := tpl.visitCommandNodesE(each); err != nil {
+		return tpl, env, err
+	}
+
+	tpl.visitCommandNodes(func(cmd *ast.CommandNode) {
+		fmt.Println("visit", cmd.Action, cmd.Entity, cmd.Params, cmd.Holes)
+		if cmd.Holes == nil {
+			cmd.Holes = make(map[string]string)
+		}
+		key := fmt.Sprintf("%s%s", cmd.Action, cmd.Entity)
+		def, _ := env.DefLookupFunc(key)
+		for _, required := range def.Required() {
+			var isInParams bool
+			var isInRefs bool
+
+			for k, _ := range cmd.Params {
+				if k == required {
+					isInParams = true
+				}
+			}
+			for k, _ := range cmd.Refs {
+				if k == required {
+					isInRefs = true
+				}
+			}
+			normalized := fmt.Sprintf("%s.%s", cmd.Entity, required)
+
+			if isInParams || isInRefs {
+				delete(cmd.Holes, normalized)
+				continue
+			} else {
+				if _, ok := cmd.Holes[required]; !ok {
+					cmd.Holes[required] = normalized
+				}
+			}
+		}
+	})
+
+	return tpl, env, nil
+}
+
 func resolveHolesPass(tpl *Template, env *Env) (*Template, *Env, error) {
+	env.Log.ExtraVerbosef("resolve holes pass")
+
 	if env.Resolved == nil {
 		env.Resolved = make(map[string]interface{})
 	}
 
-	each := func(expr *ast.CommandNode) {
-		processed := expr.ProcessHoles(env.Fillers)
+	each := func(cmd *ast.CommandNode) {
+
+		fmt.Println("visit", cmd.Action, cmd.Entity, cmd.Params, cmd.Holes)
+		processed := cmd.ProcessHoles(env.Fillers)
 		for key, v := range processed {
-			env.Resolved[expr.Entity+"."+key] = v
+			env.Resolved[cmd.Entity+"."+key] = v
 		}
 	}
 
 	tpl.visitCommandNodes(each)
 
+	env.Log.ExtraVerbosef("holes resolved: %v", env.Resolved)
+
 	return tpl, env, nil
 }
 
 func resolveMissingHolesPass(tpl *Template, env *Env) (*Template, *Env, error) {
+	env.Log.ExtraVerbosef("resolve missing holes pass")
+
 	uniqueHoles := make(map[string]struct{})
 	tpl.visitCommandNodes(func(cmd *ast.CommandNode) {
 		for _, v := range cmd.Holes {
@@ -123,17 +209,20 @@ func resolveMissingHolesPass(tpl *Template, env *Env) (*Template, *Env, error) {
 }
 
 func resolveAliasPass(tpl *Template, env *Env) (*Template, *Env, error) {
+	env.Log.ExtraVerbosef("resolve alias pass")
+
 	var unresolved []string
 	each := func(cmd *ast.CommandNode) {
 		for k, v := range cmd.Params {
 			if s, ok := v.(string); ok {
 				if strings.HasPrefix(s, "@") {
+					env.Log.ExtraVerbosef("alias resolving: %s for key %s", s, k)
 					alias := strings.TrimPrefix(s, "@")
 					actual := env.AliasFunc(k, alias)
 					if actual == "" {
 						unresolved = append(unresolved, alias)
 					} else {
-						env.Log.ExtraVerbosef("alias '%s' resolved to '%s'", alias, actual)
+						env.Log.ExtraVerbosef("alias '%s' resolved to '%s' for key %s", alias, actual, k)
 						cmd.Params[k] = actual
 						delete(cmd.Holes, k)
 					}
@@ -152,6 +241,7 @@ func resolveAliasPass(tpl *Template, env *Env) (*Template, *Env, error) {
 }
 
 func mergeExternalParamsPass(tpl *Template, env *Env) (*Template, *Env, error) {
+	env.Log.ExtraVerbosef("merge ext params pass")
 	each := func(cmd *ast.CommandNode) {
 		for k, v := range env.externalParams {
 			cmd.Params[k] = v
