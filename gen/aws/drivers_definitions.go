@@ -286,6 +286,7 @@ var DriversDefs = []driversDef{
 	{
 		Api: "elbv2",
 		Drivers: []driver{
+			// LoadBalancer
 			{
 				Action: "create", Entity: graph.LoadBalancer.String(), Input: "CreateLoadBalancerInput", Output: "CreateLoadBalancerOutput", ApiMethod: "CreateLoadBalancer", DryRunUnsupported: true, OutputExtractor: "aws.StringValue(output.LoadBalancers[0].LoadBalancerArn)",
 				RequiredParams: []param{
@@ -302,6 +303,27 @@ var DriversDefs = []driversDef{
 				Action: "delete", Entity: graph.LoadBalancer.String(), Input: "DeleteLoadBalancerInput", Output: "DeleteLoadBalancerOutput", ApiMethod: "DeleteLoadBalancer", DryRunUnsupported: true,
 				RequiredParams: []param{
 					{AwsField: "LoadBalancerArn", TemplateName: "arn", AwsType: "awsstr"},
+				},
+			},
+			// Listener
+			{
+				Action: "create", Entity: graph.Listener.String(), Input: "CreateListenerInput", Output: "CreateListenerOutput", ApiMethod: "CreateListener", DryRunUnsupported: true, OutputExtractor: "aws.StringValue(output.Listeners[0].ListenerArn)",
+				RequiredParams: []param{
+					{AwsField: "DefaultActions[0]Type", TemplateName: "actiontype", AwsType: "awsslicestruct"}, //always forward
+					{AwsField: "DefaultActions[0]TargetGroupArn", TemplateName: "target", AwsType: "awsslicestruct"},
+					{AwsField: "Certificates[0]CertificateArn", TemplateName: "certificate", AwsType: "awsslicestruct"},
+					{AwsField: "LoadBalancerArn", TemplateName: "loadbalancer", AwsType: "awsstr"},
+					{AwsField: "Port", TemplateName: "port", AwsType: "awsint64"},
+					{AwsField: "Protocol", TemplateName: "protocol", AwsType: "awsstr"}, // TCP, HTTP, HTTPS
+				},
+				ExtraParams: []param{
+					{AwsField: "SslPolicy", TemplateName: "sslpolicy", AwsType: "awsstr"},
+				},
+			},
+			{
+				Action: "delete", Entity: graph.Listener.String(), Input: "DeleteListenerInput", Output: "DeleteListenerOutput", ApiMethod: "DeleteListener", DryRunUnsupported: true,
+				RequiredParams: []param{
+					{AwsField: "ListenerArn", TemplateName: "arn", AwsType: "awsstr"},
 				},
 			},
 		},

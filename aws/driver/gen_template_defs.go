@@ -278,6 +278,22 @@ var AWSTemplatesDefinitions = map[string]template.TemplateDefinition{
 		ExtraParams:    []string{},
 		TagsMapping:    []string{},
 	},
+	"createlistener": {
+		Action:         "create",
+		Entity:         "listener",
+		Api:            "elbv2",
+		RequiredParams: []string{"actiontype", "target", "certificate", "loadbalancer", "port", "protocol"},
+		ExtraParams:    []string{"sslpolicy"},
+		TagsMapping:    []string{},
+	},
+	"deletelistener": {
+		Action:         "delete",
+		Entity:         "listener",
+		Api:            "elbv2",
+		RequiredParams: []string{"arn"},
+		ExtraParams:    []string{},
+		TagsMapping:    []string{},
+	},
 	"createuser": {
 		Action:         "create",
 		Entity:         "user",
@@ -458,6 +474,8 @@ func DriverSupportedActions() map[string][]string {
 	supported["delete"] = append(supported["delete"], "keypair")
 	supported["create"] = append(supported["create"], "loadbalancer")
 	supported["delete"] = append(supported["delete"], "loadbalancer")
+	supported["create"] = append(supported["create"], "listener")
+	supported["delete"] = append(supported["delete"], "listener")
 	supported["create"] = append(supported["create"], "user")
 	supported["delete"] = append(supported["delete"], "user")
 	supported["attach"] = append(supported["attach"], "user")

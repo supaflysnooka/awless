@@ -1656,8 +1656,9 @@ func (d *Elbv2Driver) Create_Loadbalancer(params map[string]interface{}) (interf
 		return nil, err
 	}
 	d.logger.ExtraVerbosef("elbv2.CreateLoadBalancer call took %s", time.Since(start))
-	d.logger.Verbose("create loadbalancer done")
-	return output, nil
+	id := aws.StringValue(output.LoadBalancers[0].LoadBalancerArn)
+	d.logger.Verbosef("create loadbalancer '%s' done", id)
+	return aws.StringValue(output.LoadBalancers[0].LoadBalancerArn), nil
 }
 
 // This function was auto generated
@@ -1691,6 +1692,123 @@ func (d *Elbv2Driver) Delete_Loadbalancer(params map[string]interface{}) (interf
 	}
 	d.logger.ExtraVerbosef("elbv2.DeleteLoadBalancer call took %s", time.Since(start))
 	d.logger.Verbose("delete loadbalancer done")
+	return output, nil
+}
+
+// This function was auto generated
+func (d *Elbv2Driver) Create_Listener_DryRun(params map[string]interface{}) (interface{}, error) {
+	if _, ok := params["actiontype"]; !ok {
+		return nil, errors.New("create listener: missing required params 'actiontype'")
+	}
+
+	if _, ok := params["target"]; !ok {
+		return nil, errors.New("create listener: missing required params 'target'")
+	}
+
+	if _, ok := params["certificate"]; !ok {
+		return nil, errors.New("create listener: missing required params 'certificate'")
+	}
+
+	if _, ok := params["loadbalancer"]; !ok {
+		return nil, errors.New("create listener: missing required params 'loadbalancer'")
+	}
+
+	if _, ok := params["port"]; !ok {
+		return nil, errors.New("create listener: missing required params 'port'")
+	}
+
+	if _, ok := params["protocol"]; !ok {
+		return nil, errors.New("create listener: missing required params 'protocol'")
+	}
+
+	d.logger.Verbose("params dry run: create listener ok")
+	return nil, nil
+}
+
+// This function was auto generated
+func (d *Elbv2Driver) Create_Listener(params map[string]interface{}) (interface{}, error) {
+	input := &elbv2.CreateListenerInput{}
+	var err error
+
+	// Required params
+	err = setFieldWithType(params["actiontype"], input, "DefaultActions[0]Type", awsslicestruct)
+	if err != nil {
+		return nil, err
+	}
+	err = setFieldWithType(params["target"], input, "DefaultActions[0]TargetGroupArn", awsslicestruct)
+	if err != nil {
+		return nil, err
+	}
+	err = setFieldWithType(params["certificate"], input, "Certificates[0]CertificateArn", awsslicestruct)
+	if err != nil {
+		return nil, err
+	}
+	err = setFieldWithType(params["loadbalancer"], input, "LoadBalancerArn", awsstr)
+	if err != nil {
+		return nil, err
+	}
+	err = setFieldWithType(params["port"], input, "Port", awsint64)
+	if err != nil {
+		return nil, err
+	}
+	err = setFieldWithType(params["protocol"], input, "Protocol", awsstr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extra params
+	if _, ok := params["sslpolicy"]; ok {
+		err = setFieldWithType(params["sslpolicy"], input, "SslPolicy", awsstr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	start := time.Now()
+	var output *elbv2.CreateListenerOutput
+	output, err = d.CreateListener(input)
+	output = output
+	if err != nil {
+		d.logger.Errorf("create listener error: %s", err)
+		return nil, err
+	}
+	d.logger.ExtraVerbosef("elbv2.CreateListener call took %s", time.Since(start))
+	id := aws.StringValue(output.Listeners[0].ListenerArn)
+	d.logger.Verbosef("create listener '%s' done", id)
+	return aws.StringValue(output.Listeners[0].ListenerArn), nil
+}
+
+// This function was auto generated
+func (d *Elbv2Driver) Delete_Listener_DryRun(params map[string]interface{}) (interface{}, error) {
+	if _, ok := params["arn"]; !ok {
+		return nil, errors.New("delete listener: missing required params 'arn'")
+	}
+
+	d.logger.Verbose("params dry run: delete listener ok")
+	return nil, nil
+}
+
+// This function was auto generated
+func (d *Elbv2Driver) Delete_Listener(params map[string]interface{}) (interface{}, error) {
+	input := &elbv2.DeleteListenerInput{}
+	var err error
+
+	// Required params
+	err = setFieldWithType(params["arn"], input, "ListenerArn", awsstr)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	var output *elbv2.DeleteListenerOutput
+	output, err = d.DeleteListener(input)
+	output = output
+	if err != nil {
+		d.logger.Errorf("delete listener error: %s", err)
+		return nil, err
+	}
+	d.logger.ExtraVerbosef("elbv2.DeleteListener call took %s", time.Since(start))
+	d.logger.Verbose("delete listener done")
 	return output, nil
 }
 
